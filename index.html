@@ -382,9 +382,9 @@ function render(){
   const nNew=S.demandes.filter(d=>d.statut==='nouveau').length;
   const tabs=mode==='salon'
     ?[['accueil','Accueil',I.home,nNew],['agenda','Agenda',I.cal],['caisse','Caisse',I.cash],['clients','Clients',I.users],['services','Services',I.svc]]
-    :[['c-services','Services',I.svc],['c-accueil','Mon espace',I.home],['c-messages','Messages',I.msg]];
+    :[['c-direct','Réserver',I.cal],['c-services','Services',I.svc],['c-accueil','Mon espace',I.home],['c-messages','Messages',I.msg]];
   $('#tabs').innerHTML=tabs.map(([k,l,ic,b])=>`<button class="${view===k?'on':''}" data-act="tab" data-v="${k}" aria-label="${l}">${ic}<span>${l}</span>${b?`<span class="badge">${b}</span>`:''}</button>`).join('');
-  const V={accueil,agenda,caisse,clients,services,demandes,'c-accueil':cAccueil,'c-services':cServices,'c-messages':cMessages};
+  const V={accueil,agenda,caisse,clients,services,demandes,'c-accueil':cAccueil,'c-services':cServices,'c-messages':cMessages,'c-direct':cDirect};
   $('#main').innerHTML=(V[view]||accueil)();
 }
 const demoBanner=()=>S.demo?`<div class="banner"><span>Ce sont des <b>exemples</b> pour découvrir l'app.</span><button class="btn sm ghost" data-act="clear-demo">Commencer à vide</button></div>`:'';
@@ -461,6 +461,15 @@ function asPicker(){if(PORTAL){const c=client(viewAs);return c?`<div class="bann
   return `<div class="banner"><label for="viewAs" class="small">Aperçu en tant que</label><select id="viewAs" data-input="viewAs" class="search" style="width:auto;padding:7px 10px">${S.clients.map(c=>`<option value="${c.id}" ${c.id===viewAs?'selected':''}>${esc(c.nom)}</option>`).join('')}</select></div>`}
 function fidCard(c){if(!S.fid||!S.fid.actif)return '';const n=visites(c.id),s=+S.fid.seuil||10,k=n%s,gift=n>0&&k===0;
   return `<div class="panel"><div class="sec-h"><h3>Carte de fidélité</h3><span class="small muted">${n} visite${n>1?'s':''}</span></div><div class="stamps">${Array.from({length:s},(_,i)=>`<span class="stamp ${gift||i<k?'on':''}">${i===s-1?'🎁':i+1}</span>`).join('')}</div><div class="small">${gift?`<b style="color:var(--ok)">Cadeau gagné : ${esc(S.fid.cadeau)}</b>`:`Encore ${s-k} visite${s-k>1?'s':''} pour : <b>${esc(S.fid.cadeau)}</b>`}</div></div>`}
+function guest(){try{return JSON.parse(localStorage.getItem('salonBeaute.guest')||'{}')}catch(e){return {}}}
+function guestFields(){const g=guest();return `<div class="two"><div class="f"><label for="vz-nom">Votre nom</label><input id="vz-nom" autocomplete="name" value="${esc(g.nom||'')}"></div><div class="f"><label for="vz-tel">Votre numéro WhatsApp</label><input id="vz-tel" inputmode="tel" placeholder="77 000 00 00" value="${esc(g.tel||'')}"></div></div>`}
+function saveGuest(nom,tel){try{localStorage.setItem('salonBeaute.guest',JSON.stringify({nom,tel}))}catch(e){}}
+function cDirect(){const c=me();
+  return `${c?asPicker():''}<div class="hello"><div class="lbl">${esc(S.salon.nom)}${S.salon.adresse?' · '+esc(S.salon.adresse):''}</div><h1>${c?'Réserver':'Réservez sans code'}</h1><p class="muted" style="margin:0">${c?'Choisissez le service, le jour et l’heure : le salon confirme.':'Pas besoin de compte : écrivez votre nom et votre numéro, c’est tout. Le salon vous confirme sur WhatsApp.'}</p></div>
+  <div class="actions"><button class="act" data-act="c-book">${I.cal}<b>Prendre rendez-vous</b><span>Service, jour, heure, coiffeuse</span></button><button class="act" data-act="c-question">${I.q}<b>Poser une question</b><span>Prix, durée, mèches…</span></button></div>
+  <button class="btn gold block" data-act="tab" data-v="c-services">Voir nos services et prix</button>
+  ${S.salon.tel?`<a class="btn wa block" href="${waLink(S.salon.tel,'Bonjour '+S.salon.nom+', ')}" target="_blank" rel="noopener">${I.wa} Écrire au salon sur WhatsApp</a>`:''}
+  ${c||!PORTAL?'':'<p class="note" style="margin:0;text-align:center">Vous avez un code du salon ? Allez dans « Mon espace » pour voir vos rendez-vous et votre fidélité.</p>'}`}
 function cAccueil(){const c=me();if(!c)return PORTAL?portalLogin():'<div class="empty">Ajoutez d’abord un client.</div>';
   const up=S.rdv.filter(r=>r.clientId===c.id&&daysTo(r.date)>=0&&(r.statut==='prevu'||r.statut==='arrive')).sort((a,b)=>(a.date+a.heure).localeCompare(b.date+b.heure));
   const past=S.rdv.filter(r=>r.clientId===c.id&&r.statut==='termine').sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
@@ -474,7 +483,7 @@ function cRdv(r){const e=emp(r.employeId);return `<div class="rdv ${r.statut}"><
 function cServices(){return `${asPicker()}<div class="hello"><div class="lbl">${esc(S.salon.nom)}${S.salon.adresse?' · '+esc(S.salon.adresse):''}</div><h1>Nos services</h1></div>
   ${PORTAL&&!me()&&typeof a2hs==='function'?a2hs():''}<button class="btn gold block" data-act="c-book">Réserver un rendez-vous</button>${catChips()}
   ${svcList().length?`<div class="grid">${svcList().map(p=>svcCard(p,'c-svc')).join('')}</div>`:'<div class="list"><div class="empty">Le salon n’a pas encore ajouté ses services.</div></div>'}`}
-function cMessages(){const c=me();if(!c)return PORTAL?portalLogin():'';const list=S.demandes.filter(d=>d.clientId===c.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+function cMessages(){const c=me();if(!c)return PORTAL?`<div class="hello"><div class="lbl">${esc(S.salon.nom)}</div><h1>Une question ?</h1><p class="muted" style="margin:0">Écrivez votre question sans code. Le salon vous répond sur WhatsApp.</p></div><button class="btn block" data-act="c-question">Poser une question</button><p class="note" style="margin:0">Avec un code, vous voyez ici toutes les réponses du salon : allez dans « Mon espace ».</p>`:'';const list=S.demandes.filter(d=>d.clientId===c.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   return `${asPicker()}<div class="sec-h"><h1>Mes messages</h1><button class="btn sm" data-act="c-question">+ Question</button></div>
   ${list.length?list.map(d=>`<div class="msg"><div class="sec-h"><span class="lbl">${DT[d.type]||d.type} · ${dateFr(d.date,{day:'numeric',month:'short'})}</span>${d.statut==='nouveau'?'<span class="pill">En attente</span>':'<span class="pill st-termine">Répondu</span>'}</div><div>${d.type==='rdv'?esc(d.svcNom||'')+' — '+dateFr(d.rdvDate)+' à '+esc(d.rdvHeure||''):''}${d.texte?(d.type==='rdv'?'<br>':'')+esc(d.texte):''}</div>${d.reponse?`<div class="reply"><b>Salon :</b> ${esc(d.reponse)}</div>`:''}</div>`).join(''):'<div class="list"><div class="empty">Aucun message.</div></div>'}`}
 
@@ -581,11 +590,11 @@ function cBook(svcId){const c=me();const t=today();const ds=[];for(let i=0;i<21;
   <div class="f"><label for="bk-svc">Service</label><select id="bk-svc">${S.prestations.map(p=>`<option value="${p.id}" ${p.id===svcId?'selected':''}>${esc(p.nom)} · ${fmt(p.prix)}</option>`).join('')}</select></div>
   <div class="two"><div class="f"><label for="bk-date">Jour</label><select id="bk-date">${ds.map(d=>`<option value="${d}">${dayLabel(d)}</option>`).join('')}</select></div><div class="f"><label for="bk-h">Heure</label><select id="bk-h">${freeSlots(ds[0]).map(h=>`<option>${h}</option>`).join('')}</select></div></div>
   ${(S.equipe||[]).length?`<div class="f"><label for="bk-emp">Avec</label><select id="bk-emp">${empOpts('','Peu importe')}</select></div>`:''}
-  ${c?'':`<div class="two"><div class="f"><label for="vz-nom">Votre nom</label><input id="vz-nom" autocomplete="name"></div><div class="f"><label for="vz-tel">Votre numéro WhatsApp</label><input id="vz-tel" inputmode="tel" placeholder="77 000 00 00"></div></div>`}
+  ${c?'':guestFields()}
   <div class="f"><label for="bk-t">Message (facultatif)</label><input id="bk-t" placeholder="ex. je viens avec mes mèches"></div>
   <div class="note">Le salon confirme l’heure${c?' dans vos messages':' sur WhatsApp'}.</div></div>
   <button class="btn gold block" data-act="c-book-send">Envoyer la réservation</button>`)}
-function cQuestion(){sheet('Poser une question',`<div class="panel"><div class="f"><label for="cm-t">Votre question</label><textarea id="cm-t"></textarea></div></div><button class="btn block" data-act="c-q-send">Envoyer</button>`)}
+function cQuestion(){sheet('Poser une question',`<div class="panel"><div class="f"><label for="cm-t">Votre question</label><textarea id="cm-t"></textarea></div>${me()?'':guestFields()}</div><button class="btn block" data-act="c-q-send">Envoyer</button>`)}
 
 /* ---------- actions ---------- */
 const A={
@@ -644,8 +653,10 @@ const A={
     const d={id:uid(),type:'rdv',svcId:p.id,svcNom:p.nom,rdvDate:val('bk-date'),rdvHeure:val('bk-h'),employe:val('bk-emp'),texte:val('bk-t'),date:today(),statut:'nouveau',reponse:''};
     const c=me();if(c){d.clientId=c.id;return sendDem(d,e)}
     const nom=val('vz-nom'),tel=val('vz-tel');if(nom.length<2)return toast('Écrivez votre nom');if(tel.replace(/\D/g,'').length<9)return toast('Écrivez votre numéro WhatsApp');
-    d.clientId=null;d.nomV=nom;d.telV=tel;sendVisitor(d,e)},
-  'c-q-send':e=>{const c=me();const t=val('cm-t');if(!t)return toast('Écrivez votre question');sendDem({id:uid(),clientId:c.id,type:'question',texte:t,date:today(),statut:'nouveau',reponse:''},e)},
+    d.clientId=null;d.nomV=nom;d.telV=tel;saveGuest(nom,tel);sendVisitor(d,e)},
+  'c-q-send':e=>{const c=me();const t=val('cm-t');if(!t)return toast('Écrivez votre question');
+    if(!c){const nom=val('vz-nom'),tel=val('vz-tel');if(nom.length<2)return toast('Écrivez votre nom');if(tel.replace(/\D/g,'').length<9)return toast('Écrivez votre numéro WhatsApp');saveGuest(nom,tel);return sendVisitor({id:uid(),clientId:null,nomV:nom,telV:tel,type:'question',texte:t,date:today(),statut:'nouveau',reponse:''},e)}
+    sendDem({id:uid(),clientId:c.id,type:'question',texte:t,date:today(),statut:'nouveau',reponse:''},e)},
 };
 function readEnc(){if(!enc)return;enc.clientId=val('en-client');enc.employeId=val('en-emp');document.querySelectorAll('[data-enc="ln"]').forEach(i=>{enc.lignes[+i.dataset.k].nom=i.value});document.querySelectorAll('[data-enc="lp"]').forEach(i=>{enc.lignes[+i.dataset.k].prix=num(i.value)})}
 function encTotal(){readEnc();const t=$('#en-tot');if(t)t.textContent=fmt(enc.lignes.reduce((a,l)=>a+num(l.prix),0))}
@@ -673,6 +684,10 @@ document.addEventListener('scroll',e=>{const t=e.target;if(!t||t.id!=='galT')ret
 /* ================= Langue : français + Wolof ================= */
 let LANG=(()=>{try{return localStorage.getItem('salonBeaute.lang')==='wo'?'wo':'fr'}catch(e){return 'fr'}})();
 const WO={
+"Réservez sans code":"Réserver, soxlaoo code","Pas besoin de compte : écrivez votre nom et votre numéro, c’est tout. Le salon vous confirme sur WhatsApp.":"Soxlaoo kont : bindal sa tur ak sa nimero, jeex na. Salon bi dina la dëggal ci WhatsApp.",
+"Choisissez le service, le jour et l’heure : le salon confirme.":"Tànnal liggéey bi, bés bi ak waxtu wi : salon bi dina dëggal.","Prendre rendez-vous":"Jël ndaje","Service, jour, heure, coiffeuse":"Liggéey, bés, waxtu, ku koy def","Prix, durée, mèches…":"Njëg, diir, mèches…","Voir nos services et prix":"Xool sunuy liggéey ak njëg",
+"Vous avez un code du salon ? Allez dans « Mon espace » pour voir vos rendez-vous et votre fidélité.":"Am nga code bu salon bi ? Demal ci « Sama bérab ».","Une question ?":"Am nga laaj ?","Écrivez votre question sans code. Le salon vous répond sur WhatsApp.":"Bindal sa laaj, soxlaoo code. Salon bi dina la tontu ci WhatsApp.",
+"Question envoyée":"Yónnee nañu laaj bi","Sans code : réserver ou poser une question":"Amoo code : réserver walla laaj","Pas besoin de code pour réserver ou poser une question. Le salon vous donne votre code à la première visite.":"Soxlaoo code ngir réserver walla laaj. Salon bi dina la jox sa code bu nga ñëwee.","Fermer":"Tëj",
 "Accueil":"Kër","Agenda":"Ndaje yi","Caisse":"Kees","Clients":"Kiliyaan yi","Services":"Liggéey yi","Mon espace":"Sama bérab","Messages":"Bataaxal yi","Réglages":"Réglages",
 "RDV aujourd’hui":"Ndaje tey","Encaissé aujourd’hui":"Xaalis bu dugg tey","Clients servis":"Kiliyaan yu ñu def","+ Rendez-vous":"+ Ndaje","+ Encaisser":"+ Jot xaalis",
 "À confirmer":"Lu war a dëggal","Tout voir":"Xool lépp","Aujourd’hui":"Tey","Demain":"Suba","Hier":"Démb","Aucun rendez-vous aujourd’hui.":"Amul ndaje tey.","Aucun rendez-vous ce jour.":"Amul ndaje bés boobu.",
@@ -869,7 +884,7 @@ async function portalBoot(){SB=window.supabase.createClient(SUPA_URL,SUPA_KEY,{a
   S={v:1,salon:{nom:PUB.nom||'Salon',tel:PUB.tel||'',ville:PUB.ville||'',adresse:PUB.adresse||'',ouv:PUB.ouv??9,ferm:PUB.ferm??21},
      prestations:(PUB.prestations||[]).map(p=>({...p,photos:p.photos&&p.photos.length?p.photos:(p.photo?[p.photo]:[])})),equipe:PUB.equipe||[],fid:PUB.fid||{actif:false,seuil:10,cadeau:''},
      clients:[],rdv:[],ventes:[],demandes:[]};
-  mode='client';view='c-services';
+  mode='client';view='c-direct';
   try{PCRED=JSON.parse(localStorage.getItem(PKEY)||'null')}catch(e){}
   if(PCRED&&await portalLoad(PCRED,true))view='c-accueil';
   render()}
@@ -885,7 +900,7 @@ function portalLogin(){return `<div class="hello"><div class="lbl">${esc(S.salon
   <div class="f"><label for="pl-tel">Numéro de téléphone</label><input id="pl-tel" inputmode="tel" autocomplete="tel" placeholder="77 000 00 00"></div>
   <div class="f"><label for="pl-code">Code</label><input id="pl-code" inputmode="numeric" maxlength="6" placeholder="4 chiffres"></div>
   <button class="btn block" data-act="pl-go">Entrer</button></div>
-  <div class="panel"><b>Pas encore de code ?</b><span class="small muted">Vous pouvez réserver sans code : appuyez sur « Réserver ». Le salon vous donne votre code à la première visite.</span><button class="btn gold" data-act="c-book">Réserver un rendez-vous</button></div>`}
+  <div class="panel"><b>Pas encore de code ?</b><span class="small muted">Pas besoin de code pour réserver ou poser une question. Le salon vous donne votre code à la première visite.</span><button class="btn gold" data-act="tab" data-v="c-direct">Sans code : réserver ou poser une question</button></div>`}
 async function sendDem(d,btn){
   if(!PORTAL){S.demandes.push(d);save();closeSheet();view=mode==='client'?'c-messages':view;render();return toast(tr('Envoyé au salon'))}
   if(btn){btn.disabled=true;btn.textContent=tr('Envoi…')}
@@ -894,10 +909,12 @@ async function sendDem(d,btn){
   await portalLoad(PCRED,true);closeSheet();view='c-messages';render();toast(tr(d.type==='rdv'?'Réservation envoyée : le salon va confirmer':'Envoyé au salon'))}
 async function sendVisitor(d,btn){
   if(PORTAL){btn.disabled=true;btn.textContent=tr('Envoi…');
-    let r;try{r=await SB.rpc('salon_visiteur_demande',{p_shop:PORTAL,p_nom:d.nomV,p_phone:d.telV,p_texte:d.texte||'',p_svc:d.svcId||'',p_svc_nom:d.svcNom||'',p_rdv_date:d.rdvDate||null,p_rdv_heure:d.rdvHeure||null,p_employe:d.employe||''})}catch(e){r={error:e}}
+    let r;try{r=d.type==='question'?await SB.rpc('salon_visiteur_question',{p_shop:PORTAL,p_nom:d.nomV,p_phone:d.telV,p_texte:d.texte||''})
+      :await SB.rpc('salon_visiteur_demande',{p_shop:PORTAL,p_nom:d.nomV,p_phone:d.telV,p_texte:d.texte||'',p_svc:d.svcId||'',p_svc_nom:d.svcNom||'',p_rdv_date:d.rdvDate||null,p_rdv_heure:d.rdvHeure||null,p_employe:d.employe||''})}catch(e){r={error:e}}
     if(r.error){btn.disabled=false;btn.textContent=tr('Réessayer');return toast(errTxt(r.error))}}
   else{S.demandes.push(d);save()}
-  closeSheet();sheet('Réservation envoyée',`<div class="panel"><b>Merci ${esc(d.nomV)} !</b><div>Le salon a reçu votre demande : ${esc(d.svcNom)}, ${esc(dayLabel(d.rdvDate).toLowerCase())} à ${esc(d.rdvHeure)}. Il vous confirme l’heure sur WhatsApp au ${esc(d.telV)}.</div>${S.salon.tel?`<a class="btn wa" href="${waLink(S.salon.tel,'Bonjour '+S.salon.nom+', je viens de réserver '+d.svcNom+' '+dayLabel(d.rdvDate).toLowerCase()+' à '+d.rdvHeure+'. Mon nom : '+d.nomV+'.')}" target="_blank" rel="noopener">${I.wa} Écrire aussi sur WhatsApp</a>`:''}</div>`)}
+  const q=d.type==='question';
+  closeSheet();sheet(q?'Question envoyée':'Réservation envoyée',`<div class="panel"><b>Merci ${esc(d.nomV)} !</b><div>${q?`Le salon a reçu votre question. Il vous répond sur WhatsApp au ${esc(d.telV)}.`:`Le salon a reçu votre demande : ${esc(d.svcNom)}, ${esc(dayLabel(d.rdvDate).toLowerCase())} à ${esc(d.rdvHeure)}. Il vous confirme l’heure sur WhatsApp au ${esc(d.telV)}.`}</div>${S.salon.tel?`<a class="btn wa" href="${waLink(S.salon.tel,(q?'Bonjour '+S.salon.nom+', je viens de vous poser une question sur votre page. Mon nom : '+d.nomV+'.':'Bonjour '+S.salon.nom+', je viens de réserver '+d.svcNom+' '+dayLabel(d.rdvDate).toLowerCase()+' à '+d.rdvHeure+'. Mon nom : '+d.nomV+'.'))}" target="_blank" rel="noopener">${I.wa} Écrire aussi sur WhatsApp</a>`:''}<button class="btn ghost" data-act="close">Fermer</button></div>`)}
 /* ---------- écran d'accueil du téléphone ---------- */
 const IS_IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const IS_APP=(()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}})();
@@ -935,7 +952,7 @@ Object.assign(A,{
   logout:e=>{if(!outArm){outArm=true;e.textContent=tr('Touchez encore pour sortir');return}outArm=false;doLogout()},
   'pl-go':async e=>{const tel=val('pl-tel'),code=val('pl-code');if(tel.replace(/\D/g,'').length<9||code.length<4)return toast(tr('Écrivez votre numéro et votre code'));
     e.disabled=true;e.textContent=tr('Connexion…');const ok=await portalLoad({tel,code});if(!ok){e.disabled=false;e.textContent=tr('Entrer');return}view='c-accueil';render();toast(tr('Bienvenue'))},
-  'pl-out':()=>{PCRED=null;try{localStorage.removeItem(PKEY)}catch(e){}S.clients=[];S.rdv=[];S.demandes=[];viewAs=null;view='c-services';render()},
+  'pl-out':()=>{PCRED=null;try{localStorage.removeItem(PKEY)}catch(e){}S.clients=[];S.rdv=[];S.demandes=[];viewAs=null;view='c-direct';render()},
 });
 function selLink(){const el=$('#lnk');if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);toast(tr('Lien sélectionné : copiez-le'))}
 
